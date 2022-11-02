@@ -2,9 +2,14 @@
   "name": "http-message-parser",
   "version": "1.0.0",
   "description": "HTTP message parser",
-  "main": "index.js",
+  "module": "dist/index.esm.js",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist/*"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "node build.js"
   },
   "author": "Sakari Mursu <mskri@mursu.dev>",
   "license": "MIT",
