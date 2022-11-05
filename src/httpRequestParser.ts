@@ -2,11 +2,19 @@ import { EOL } from 'os';
 import * as http from 'http';
 
 const DEFAULT_METHOD = 'GET';
-const defaultVersion = 'HTTP/1.1';
+const DEFAULT_VERSION = 'HTTP/1.1';
 
 // To match long request-line that has been split by either `/`, `?` or `&`.
 // Matches lines starting with 0 or more whitespace followed by `&`, `?` or `/`
 const LONG_REQUEST_LINE_BREAK_PREFIX = /^\s*[&\?/]/;
+
+// Matches strings starting with method followed by one whitespace
+const REQUEST_LINE_PREFIX = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|CONNECT|TRACE)\s/;
+
+// https://www.rfc-editor.org/rfc/rfc9110.html#name-protocol-version
+// Matches one whitespace followed by `HTTP/`, followed by one or more (any) character,
+// followed by line end
+const HTTP_VERSION = /\s+HTTP\/.*$/;
 
 // https://www.rfc-editor.org/rfc/rfc9110.html#name-field-names
 const HEADER_LINE_FIELD_NAME = /^[a-zA-Z-_]+$/;
@@ -26,10 +34,16 @@ type Method = typeof methods[number];
 type HttpRequest = {
   method: Method;
   pathname: string;
+  uri: string;
+  version: string;
   headers: Headers;
 };
 
+type RequestLine = Pick<HttpRequest, 'method' | 'pathname' | 'uri' | 'version'>;
+
 type Headers = http.OutgoingHttpHeaders;
+
+type HeaderValue = http.OutgoingHttpHeader | undefined;
 
 /**
  * Parses HTTP request from string into object.
@@ -45,8 +59,7 @@ type Headers = http.OutgoingHttpHeaders;
  */
 export function parseHttpRequest(message: string): HttpRequest {
   const lines: string[] = message.split(EOL);
-
-  let rawRequestLine: string = '';
+  const requestLines: string[] = [];
   const headersLines: string[] = [];
   const bodyLines: string[] = [];
 
@@ -58,11 +71,11 @@ export function parseHttpRequest(message: string): HttpRequest {
 
     switch (state) {
       case ParseState.RequestLine:
-        rawRequestLine = currentLine;
+        requestLines.push(currentLine);
 
         const isRequestSplitIntoMultipleLines = LONG_REQUEST_LINE_BREAK_PREFIX.test(nextLine);
         if (nextLine === undefined || isRequestSplitIntoMultipleLines) {
-          // Request has only request-line
+          // Request has only request-line or request-line is broken into multiple lines
           break;
         }
 
@@ -94,11 +107,77 @@ export function parseHttpRequest(message: string): HttpRequest {
   }
 
   const headers = parseHeaders(headersLines);
+  const host = getHeader(headers, 'host');
+
+  const rawRequestLine = requestLines.map((line) => line.trim()).join('');
+  const requestLine = parseRequestLine(rawRequestLine, host);
 
   return {
-    method: 'CONNECT',
-    pathname: 'placeholder',
+    ...requestLine,
     headers,
+  };
+}
+
+/**
+ * Parse request-line into object.
+ *
+ * Request-line format:
+ *   Request-Line = Method SP Request-URI SP HTTP-Version CRLF
+ *
+ * @param {string} line Request-line string to parse.
+ * @returns {RequestLine} Request-line object.
+ */
+function parseRequestLine(line: string, host: HeaderValue): RequestLine {
+  let method: Method;
+  let requestUri: string;
+  let pathname: string;
+  let uri: string;
+  let version: string;
+
+  let match: RegExpExecArray | null;
+  if ((match = REQUEST_LINE_PREFIX.exec(line))) {
+    // We can be sure that method matched here is one of the allowed ones because of the regexp exec
+    // Note: Of course if `methods` array and regexp are not in sync it can be something else...
+    method = match[1] as Method;
+    requestUri = line.substring(match[0].length);
+  } else {
+    method = DEFAULT_METHOD;
+    requestUri = line;
+  }
+
+  requestUri = requestUri.trim();
+
+  // Remove HTTP version from requestUri
+  if ((match = HTTP_VERSION.exec(requestUri))) {
+    version = match[0].trim();
+    requestUri = requestUri.substring(0, match.index);
+  } else {
+    version = DEFAULT_VERSION;
+  }
+
+  try {
+    const { href, pathname: path, search } = new URL(requestUri);
+    pathname = path + search;
+    uri = href;
+  } catch (_) {
+    pathname = requestUri;
+
+    // If host header is set and URL is relative path change it to absolute URL
+    if (host && requestUri.startsWith('/')) {
+      const [, port] = host.toString().split(':') as (string | undefined)[];
+      const scheme = port === '443' || port === '8443' ? 'https' : 'http';
+      const hostWithoutPort = host.toString().replace(/:(443|8443|80)$/, '');
+      uri = `${scheme}://${hostWithoutPort}${pathname}`;
+    } else {
+      throw new HttpParseError('Host header is required for relative URI');
+    }
+  }
+
+  return {
+    method,
+    pathname,
+    uri,
+    version,
   };
 }
 
@@ -148,6 +227,18 @@ function parseHeaders(headerLines: string[]): Headers {
   });
 
   return headers;
+}
+
+function getHeader(headers: Headers, name: string): HeaderValue {
+  if (!headers || !name) {
+    return undefined;
+  }
+
+  const headerName = Object.keys(headers).find(
+    (header) => header.toLowerCase() === name.toLowerCase(),
+  );
+
+  return headerName && headers[headerName];
 }
 
 export class HttpParseError extends Error {
