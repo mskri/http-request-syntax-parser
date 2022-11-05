@@ -1,7 +1,13 @@
 {
   "name": "http-message-parser",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "HTTP message parser",
+  "author": "Sakari Mursu <mskri@mursu.dev>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mskri/http-message-parser.git"
+  },
+  "license": "MIT",
   "module": "dist/index.esm.js",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -12,8 +18,6 @@
     "build": "node build.js",
     "format": "prettier --write 'src/**/*.ts'"
   },
-  "author": "Sakari Mursu <mskri@mursu.dev>",
-  "license": "MIT",
   "devDependencies": {
     "esbuild": "^0.15.12",
     "npm-dts": "^1.3.12",
