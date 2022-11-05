@@ -39,7 +39,7 @@ type RequestLine = {
  * @returns {HttpRequest} HTTP request message parsed into object.
  * @throws {HttpParseError} Parse error.
  */
-export function parseHttpMessage(message: string): HttpRequest {
+export function parseHttpRequest(message: string): HttpRequest {
   const lines: string[] = message.split(EOL);
 
   let rawRequestLine: string = '';
