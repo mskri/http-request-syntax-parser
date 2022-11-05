@@ -31,7 +31,7 @@ enum ParseState {
 const methods = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE'] as const;
 type Method = typeof methods[number];
 
-type HttpRequest = {
+export type HttpRequest = {
   method: Method;
   pathname: string;
   uri: string;
