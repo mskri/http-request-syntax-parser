@@ -90,6 +90,10 @@ export function parseHttpRequest(message: string): HttpRequest {
         // Do nothing for comment line
         break;
       case ParseState.RequestLine:
+        if (requestLines.length === 0 && !REQUEST_LINE_PREFIX.test(currentLine)) {
+          throw new HttpParseError('Request-line not starting with method');
+        }
+
         requestLines.push(currentLine);
 
         const isRequestSplitIntoMultipleLines = LONG_REQUEST_LINE_BREAK_PREFIX.test(nextLine);

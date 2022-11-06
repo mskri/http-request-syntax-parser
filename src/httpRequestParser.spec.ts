@@ -3,6 +3,15 @@ import { it, describe, expect } from 'vitest';
 import { HttpParseError, HttpRequest, parseHttpRequest } from './httpRequestParser';
 
 describe('parseHttpRequest', () => {
+  it("should throw error when request doesn't start with request-line", () => {
+    const message = dedent`
+    Host: example.com
+    GET /api/path`;
+
+    expect(() => parseHttpRequest(message)).toThrowError(HttpParseError);
+    expect(() => parseHttpRequest(message)).toThrowError(/Request-line not starting with method/);
+  });
+
   it('should parse request-line', () => {
     const message = 'GET https://mursu.dev/api/path';
 
