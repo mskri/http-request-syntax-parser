@@ -347,4 +347,31 @@ describe('parseHttpRequest', () => {
     expect(() => parseHttpRequest(message)).toThrowError(HttpParseError);
     expect(() => parseHttpRequest(message)).toThrowError(/No Content-Type header set for body/);
   });
+
+  it('should parse ignore comment lines', () => {
+    const message = dedent`
+    // This is a comment
+    POST http://mursu.dev/posts
+    Content-Type: application/json
+    // This is also a comment
+    Example-Field: value
+
+    {
+      "foo": "bar",
+      // Comments also work in body section
+      "bar": 123
+    }`;
+
+    expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: '{ "foo": "bar", "bar": 123 }',
+      headers: {
+        'Content-Type': 'application/json',
+        'Example-Field': 'value',
+      },
+      method: 'POST',
+      pathname: '/posts',
+      uri: 'http://mursu.dev/posts',
+      version: 'HTTP/1.1',
+    });
+  });
 });

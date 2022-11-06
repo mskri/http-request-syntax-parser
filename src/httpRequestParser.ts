@@ -8,6 +8,9 @@ const DEFAULT_VERSION = 'HTTP/1.1';
 // Matches lines starting with 0 or more whitespace followed by `&`, `?` or `/`
 const LONG_REQUEST_LINE_BREAK_PREFIX = /^\s*[&\?/]/;
 
+// Matches double forward slashes
+const COMMENT_LINE_PREFIX = /^\/\/\s*/;
+
 // Matches strings starting with method followed by one whitespace
 const REQUEST_LINE_PREFIX = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|CONNECT|TRACE)\s/;
 
@@ -21,7 +24,9 @@ const HEADER_LINE_FIELD_NAME = /^[a-zA-Z-_]+$/;
 
 // https://www.rfc-editor.org/rfc/rfc9110.html#name-field-values
 const HEADER_LINE_FIELD_VALUE = /^[a-zA-Z0-9_ :;.,\\\/"'?!(){}[\]@<>=\-+*#$&`|~^%]*$/;
+
 enum ParseState {
+  Comment,
   RequestLine,
   Header,
   Body,
@@ -66,11 +71,24 @@ export function parseHttpRequest(message: string): HttpRequest {
 
   let state = ParseState.RequestLine;
   let currentLine: string | undefined;
+  let prevState: ParseState | null = null;
 
   while ((currentLine = lines.shift()?.trim()) !== undefined) {
     const nextLine: string | undefined = lines[0]?.trim();
 
+    if (COMMENT_LINE_PREFIX.test(currentLine)) {
+      prevState = state;
+      state = ParseState.Comment;
+    }
+
     switch (state) {
+      case ParseState.Comment:
+        if (!COMMENT_LINE_PREFIX.test(nextLine)) {
+          state = prevState ?? ParseState.RequestLine;
+          prevState = null;
+        }
+        // Do nothing for comment line
+        break;
       case ParseState.RequestLine:
         requestLines.push(currentLine);
 
