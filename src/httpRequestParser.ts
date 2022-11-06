@@ -37,6 +37,7 @@ export type HttpRequest = {
   uri: string;
   version: string;
   headers: Headers;
+  body: string | undefined;
 };
 
 type RequestLine = Pick<HttpRequest, 'method' | 'pathname' | 'uri' | 'version'>;
@@ -112,9 +113,13 @@ export function parseHttpRequest(message: string): HttpRequest {
   const rawRequestLine = requestLines.map((line) => line.trim()).join('');
   const requestLine = parseRequestLine(rawRequestLine, host);
 
+  const contentType = getHeader(headers, 'content-type');
+  const body = parseBody(bodyLines, contentType);
+
   return {
     ...requestLine,
     headers,
+    body,
   };
 }
 
@@ -227,6 +232,18 @@ function parseHeaders(headerLines: string[]): Headers {
   });
 
   return headers;
+}
+
+function parseBody(lines: string[], contentType: HeaderValue): string | undefined {
+  if (lines.length === 0) {
+    return undefined;
+  }
+
+  if (lines.length > 0 && contentType == undefined) {
+    throw new HttpParseError('No Content-Type header set for body');
+  }
+
+  return lines.join(' ').trim();
 }
 
 function getHeader(headers: Headers, name: string): HeaderValue {

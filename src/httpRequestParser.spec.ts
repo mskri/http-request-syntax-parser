@@ -7,6 +7,7 @@ describe('parseHttpRequest', () => {
     const message = 'GET https://mursu.dev/api/path';
 
     expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {},
       method: 'GET',
       pathname: '/api/path',
@@ -53,6 +54,7 @@ describe('parseHttpRequest', () => {
     Host: example.com`;
 
     expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         Host: 'example.com',
       },
@@ -73,6 +75,7 @@ describe('parseHttpRequest', () => {
     Host: example.com:8443`;
 
     expect(parseHttpRequest(message1)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         Host: 'example.com:443',
       },
@@ -83,6 +86,7 @@ describe('parseHttpRequest', () => {
     });
 
     expect(parseHttpRequest(message2)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         Host: 'example.com:8443',
       },
@@ -133,6 +137,7 @@ describe('parseHttpRequest', () => {
     Host: 127.0.0.1:8000`;
 
     expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         Host: '127.0.0.1:8000',
       },
@@ -149,6 +154,7 @@ describe('parseHttpRequest', () => {
     Host: 127.0.0.1:8000`;
 
     expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         Host: '127.0.0.1:8000',
       },
@@ -165,6 +171,7 @@ describe('parseHttpRequest', () => {
     Host: 127.0.0.1:8000`;
 
     expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         Host: '127.0.0.1:8000',
       },
@@ -181,6 +188,7 @@ describe('parseHttpRequest', () => {
     api-key: 12345`;
 
     expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         'api-key': '12345',
       },
@@ -197,6 +205,7 @@ describe('parseHttpRequest', () => {
     Host: mursu.dev`;
 
     expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         Host: 'mursu.dev',
       },
@@ -223,6 +232,7 @@ describe('parseHttpRequest', () => {
     Example-Field:`;
 
     expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         'Example-Field': '',
       },
@@ -240,6 +250,7 @@ describe('parseHttpRequest', () => {
     Example-Field: Baz`;
 
     expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         'Example-Field': 'Foo, Bar, Baz',
       },
@@ -257,6 +268,7 @@ describe('parseHttpRequest', () => {
     Cookie: name2=value2`;
 
     expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: undefined,
       headers: {
         Cookie: 'name=value; name2=value2',
       },
@@ -283,5 +295,56 @@ describe('parseHttpRequest', () => {
 
     expect(() => parseHttpRequest(message)).toThrowError(HttpParseError);
     expect(() => parseHttpRequest(message)).toThrowError(/Header field-value is not valid/);
+  });
+
+  it('should parse single-line request body', () => {
+    const message = dedent`
+    POST http://mursu.dev/posts
+    Content-Type: application/json
+
+    { "foo": "bar" }`;
+
+    expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: '{ "foo": "bar" }',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+      pathname: '/posts',
+      uri: 'http://mursu.dev/posts',
+      version: 'HTTP/1.1',
+    });
+  });
+
+  it('should parse multiline request body', () => {
+    const message = dedent`
+    POST http://mursu.dev/posts
+    Content-Type: application/json
+
+    {
+      "foo": "bar",
+      "bar": 123
+    }`;
+
+    expect(parseHttpRequest(message)).toEqual<HttpRequest>({
+      body: '{ "foo": "bar", "bar": 123 }',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+      pathname: '/posts',
+      uri: 'http://mursu.dev/posts',
+      version: 'HTTP/1.1',
+    });
+  });
+
+  it('should parse request body and examine the content to determine content-type when no content-type header', () => {
+    const message = dedent`
+    POST http://mursu.dev/posts
+
+    { "foo": "bar" }`;
+
+    expect(() => parseHttpRequest(message)).toThrowError(HttpParseError);
+    expect(() => parseHttpRequest(message)).toThrowError(/No Content-Type header set for body/);
   });
 });
